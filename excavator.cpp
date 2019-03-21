@@ -313,9 +313,11 @@ private:
         File file;
         uint32_t cluster;
         uint8_t* buff;
-        rsize_t pos;
-        size_t cbFilled;
-        size_t cbBuff;
+        unsigned int pos;
+        unsigned int cbFilled;
+        unsigned int cbBuff;
+        uint64_t cbValid;
+        uint64_t cbFile;
         bool chain;
 
         exFatFile(const exFatFile&);
@@ -333,13 +335,13 @@ private:
             }
             if (next_cluster > 0xfffffff6 || next_cluster <= 1) {
                 if (next_cluster == 0xfffffff7) {
-                    fprintf(stderr, "0x%08X: Bad cluster\n", next_cluster);
+                    fprintf(stderr, "%I64X [%08X] Bad cluster\n", fat_offset, next_cluster);
                 } else if (next_cluster == 0xfffffff8) {
-                    fprintf(stderr, "0x%08X: Media descriptor\n", next_cluster);
+                    fprintf(stderr, "%I64X [%08X] Media descriptor\n", fat_offset, next_cluster);
                 } else if (next_cluster == 0xffffffff) {
-                    //fprintf(stderr, "0x%08X: End of file\n", next_cluster);
+                    //fprintf(stderr, "%I64X [%08X] End of file\n", fat_offset, next_cluster);
                 } else {
-                    fprintf(stderr, "0x%08X\n", next_cluster);
+                    fprintf(stderr, "%I64X [%08X] \?\?\? FAT corrupted\n", fat_offset, next_cluster);
                 }
                 return 0;
             }
@@ -351,9 +353,27 @@ private:
             if (this->cluster == 0) {
                 return false;
             }
+            if (this->cbFile == 0) {
+                return false;
+            }
+            const unsigned int cbToRead = this->cbFile < this->cbBuff ? static_cast<unsigned int>(this->cbFile) : this->cbBuff;
+            if (this->cbValid == 0) {
+                this->cbFile -= cbToRead;
+                this->cbFilled = cbToRead;
+                ::memset(this->buff, 0, cbToRead);
+                return true;
+            }
             const uint64_t offset = this->owner.cluster_to_offset(this->cluster);
             this->cluster = this->get_next_cluster();
-            return (this->cbFilled = this->file.read_n_at(offset, this->buff, this->cbBuff)) > 0;
+            const unsigned int cbReadable = this->cbValid < cbToRead ? static_cast<unsigned int>(this->cbValid) : cbToRead;
+            const unsigned int cbRead = this->file.read_n_at(offset, this->buff, cbReadable);
+            if (cbRead < cbToRead) {
+                ::memset(this->buff + cbRead, 0, cbToRead - cbRead);
+            }
+            this->cbFile -= cbToRead;
+            this->cbValid -= cbReadable;
+            this->cbFilled = cbToRead;
+            return true;
         }
         bool open_worker(uint32_t cluster, bool chain)
         {
@@ -375,6 +395,8 @@ private:
             , pos(0)
             , cbFilled(0)
             , cbBuff(self.cluster_size)
+            , cbValid()
+            , cbFile()
             , chain()
         {
         }
@@ -384,10 +406,16 @@ private:
         }
         bool open(uint32_t cluster)
         {
+            this->cbFile = this->cbValid = ~0ULL;
             return this->open_worker(cluster, false);
         }
         bool open(const stream_extension& se)
         {
+            this->cbValid = se.valid_data_length;
+            this->cbFile = se.data_length;
+            if (this->cbValid > this->cbFile) {
+                this->cbValid = this->cbFile;
+            }
             return this->open_worker(se.first_cluster, (se.flags & 2) == 0);
         }
         size_t read(void* buffer, size_t cb)
@@ -733,6 +761,7 @@ private:
                 }
             }
             if (se.first_cluster == 0) {
+                fwprintf(stderr, L"zero first cluster: %s\n", path);
                 continue;
             }
             const uint64_t file_offset = this->cluster_to_offset(se.first_cluster);
