@@ -687,13 +687,13 @@ private:
         loc.wDay    = static_cast<WORD>(tm.day);
         loc.wHour   = static_cast<WORD>(tm.hour);
         loc.wMinute = static_cast<WORD>(tm.minute);
-        loc.wSecond = static_cast<WORD>(tm.second + ten_ms % 200) / 100;
+        loc.wSecond = static_cast<WORD>(tm.second) + static_cast<WORD>(ten_ms % 200 / 100);
         loc.wMilliseconds = static_cast<WORD>(ten_ms * 10 % 1000);
         ::SystemTimeToFileTime(&loc, &ft);
         uint64_t time = ft.dwLowDateTime | static_cast<uint64_t>(ft.dwHighDateTime) << 32;
-        if (bias & 0x80) {
-            int32_t min = static_cast<int8_t>(bias << 1) >> 1 * 15;
-            time += static_cast<int64_t>(min) * 600000000;
+        if ((bias & 0x80) == 0x80) {
+            const int32_t minutes = -(static_cast<int8_t>((bias & 0x7f) << 1) >> 1) * 15;
+            time += static_cast<int64_t>(minutes) * 600000000;
         }
         return static_cast<int64_t>(time);
     }
