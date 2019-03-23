@@ -760,10 +760,6 @@ private:
                     ::wcsncat_s(path, cchMax, reinterpret_cast<const wchar_t*>(fn.name), cch);
                 }
             }
-            if (se.first_cluster == 0) {
-                fwprintf(stderr, L"zero first cluster: %s\n", path);
-                continue;
-            }
             const uint64_t file_offset = this->cluster_to_offset(se.first_cluster);
             const dos_datetime tm = to_dos_datetime(fe.time_modified);
 #define TIMEFMT     "%04u-%02u-%02u %02u:%02u:%02u"
