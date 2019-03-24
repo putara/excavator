@@ -264,13 +264,13 @@ private:
             }
             if (next_cluster > 0xfffffff6 || next_cluster <= 1) {
                 if (next_cluster == 0xfffffff7) {
-                    fprintf(stderr, "%I64X [%08X] Bad cluster\n", fat_offset, next_cluster);
+                    this->owner.log(L"%I64X [%08X] Bad cluster\n", fat_offset, next_cluster);
                 } else if (next_cluster == 0xfffffff8) {
-                    fprintf(stderr, "%I64X [%08X] Media descriptor\n", fat_offset, next_cluster);
+                    this->owner.log(L"%I64X [%08X] Media descriptor\n", fat_offset, next_cluster);
                 } else if (next_cluster == 0xffffffff) {
-                    //fprintf(stderr, "%I64X [%08X] End of file\n", fat_offset, next_cluster);
+                    //this->owner.log(L"%I64X [%08X] End of file\n", fat_offset, next_cluster);
                 } else {
-                    fprintf(stderr, "%I64X [%08X] \?\?\? FAT corrupted\n", fat_offset, next_cluster);
+                    this->owner.log(L"%I64X [%08X] \?\?\? FAT corrupted\n", fat_offset, next_cluster);
                 }
                 return 0;
             }
@@ -400,6 +400,8 @@ private:
     uint32_t fat_cluster;
     uint32_t root_cluster;
     File file;
+    FILE* flst;
+    FILE* flog;
 
     template <typename T, size_t count>
     static bool is_all_zero(const T (&array)[count])
@@ -476,6 +478,20 @@ private:
         }
         return 0;
     }
+    void log(__in const wchar_t* format, ...) const
+    {
+        va_list args;
+        va_start(args, format);
+        ::vfwprintf_s(this->flog, format, args);
+        va_end(args);
+    }
+    void out(__in const wchar_t* format, ...) const
+    {
+        va_list args;
+        va_start(args, format);
+        ::vfwprintf_s(this->flst, format, args);
+        va_end(args);
+    }
     static bool wildmatch_worker(__in const wchar_t* str, __in const wchar_t* pat)
     {
         for (; *pat != L'\0'; pat++) {
@@ -517,29 +533,50 @@ private:
     }
 
 public:
-    exFat(uint32_t cs, uint32_t rs)
-        : cluster_size(cs), reserved_sectors(rs), upcase_cluster(), fat_cluster(), root_cluster()
+    exFat(uint32_t cs, uint32_t rs, const wchar_t* lst, const wchar_t* nfo)
+        : cluster_size(cs), reserved_sectors(rs), upcase_cluster()
+        , fat_cluster(), root_cluster(), flst(), flog()
     {
+        if (lst != NULL) {
+            this->flst = ::_wfopen(lst, L"w, ccs=UTF-8");
+        }
+        if (this->flst == NULL) {
+            this->flst = stdout;
+        }
+        if (nfo != NULL) {
+            this->flog = ::_wfopen(nfo, L"w, ccs=UTF-8");
+        }
+        if (this->flog == NULL) {
+            this->flog = stderr;
+        }
+    }
+    ~exFat()
+    {
+        if (this->flst != stdout) {
+            ::fclose(this->flst);
+        }
+        if (this->flog != stderr) {
+            ::fclose(this->flog);
+        }
     }
     bool open(const wchar_t* path)
     {
-#define ISPOW2(x)   (((x) & (x) - 1) == 0)
-#define KB          * (1ULL << 10)
-#define MB          * (1ULL << 20)
-#define GB          * (1ULL << 30)
-
         if (this->file.open(path, false) == false) {
-            fprintf(stderr, "cannot open\n");
+            fprintf_s(stderr, "cannot open\n");
             return false;
         }
+        this->log(L"file: \"%s\"\n", path);
         if (this->cluster_size == 0) {
             // use default cluster size by Microsoft
             // https://support.microsoft.com/en-us/help/140365/default-cluster-size-for-ntfs-fat-and-exfat
             int64_t size = this->file.size();
             if (size < 0) {
-                printf("cannot obtain file info\n");
+                fprintf_s(stderr, "cannot obtain file info\n");
                 return false;
             }
+#define KB * (1ULL << 10)
+#define MB * (1ULL << 20)
+#define GB * (1ULL << 30)
             if (size < 256 MB) {
                 this->cluster_size = 4 KB;
             } else if (size < 32 GB) {
@@ -547,36 +584,39 @@ public:
             } else {
                 this->cluster_size = 128 KB;
             }
+#undef GB
+#undef MB
+#undef KB
         }
         this->upcase_cluster = this->find_upcase_table();
         if (this->upcase_cluster == 0) {
-            fprintf(stderr, "No upcase table found\n");
+            fprintf_s(stderr, "No upcase table found\n");
             return false;
         }
         this->fat_cluster = this->find_fat_table(this->upcase_cluster);
         if (this->fat_cluster == 0) {
-            fprintf(stderr, "No file allocation table found\n");
+            fprintf_s(stderr, "No file allocation table found\n");
             return false;
         }
         root_entry root = {};
         const uint32_t root_cluster = this->find_root(&root);
         if (root_cluster == 0) {
-            fprintf(stderr, "No root directory found\n");
+            fprintf_s(stderr, "No root directory found\n");
             return false;
         }
         if (this->reserved_sectors == 0) {
             this->reserved_sectors = this->upcase_cluster - root.upc.first_cluster + 2;
         }
         if (root_cluster <= this->reserved_sectors) {
-            fprintf(stderr, "No root directory found\n");
+            fprintf_s(stderr, "No root directory found\n");
             return false;
         }
         this->root_cluster = root_cluster - this->reserved_sectors + 2;
-        char buff[128];
-        sprintf_s(buff, 128, "reserved_sectors: %u, cluster_size: %u, fat_cluster: %u, upcase_cluster: %u, %u, root_cluster: %08I64x (%u)\n",
+        this->log(
+            L"reserved_sectors: %u, cluster_size: %u, fat_cluster: %u, upcase_cluster: %u, %u, root_cluster: %08I64x (%u)\n",
             reserved_sectors, cluster_size,
-            fat_cluster, upcase_cluster, root.upc.first_cluster, static_cast<uint64_t>(root_cluster) * cluster_size, this->root_cluster);
-        _cprintf("%s", buff);
+            fat_cluster, upcase_cluster, root.upc.first_cluster,
+            static_cast<uint64_t>(root_cluster) * cluster_size, this->root_cluster);
         return true;
     }
     void enum_files(const wchar_t* outdir, const wchar_t* pattern) const
@@ -585,9 +625,9 @@ public:
         if (dir.open(this->root_cluster) == false || dir.read(NULL, sizeof(root_entry)) != sizeof(root_entry)) {
             return;
         }
-        printf(
-        "   Date      Time    Attr         Size      Cluster      File Offset  Path\n"
-        "------------------- ----- ------------ ------------ ----------------  ------------------------\n");
+        this->out(
+            L"   Date      Time    Attr         Size      Cluster      File Offset  Path\n"
+            L"------------------- ----- ------------ ------------ ----------------  ------------------------\n");
         this->enum_files_worker(dir, L"", outdir, pattern, 0);
     }
 
@@ -691,10 +731,10 @@ private:
             }
             const uint64_t file_offset = this->cluster_to_offset(se.first_cluster);
             const dos_datetime tm = to_dos_datetime(fe.time_modified);
-#define TIMEFMT     "%04u-%02u-%02u %02u:%02u:%02u"
+#define TIMEFMT     L"%04u-%02u-%02u %02u:%02u:%02u"
 #define TIME(t)     (t).year, (t).month, (t).day, (t).hour, (t).minute, (t).second
 #define ATTR(b, t)  ((fe.attributes & (b)) ? (L ## t) : L'.')
-            printf(TIMEFMT " %c%c%c%c%c %12I64u %12u %16I64X  ",
+            this->out(TIMEFMT L" %c%c%c%c%c %12I64u %12u %16I64X  %s\n",
                 TIME(tm),
                 ATTR(0x10, 'D'),
                 ATTR(0x20, 'A'),
@@ -702,18 +742,16 @@ private:
                 ATTR(2, 'H'),
                 ATTR(1, 'R'),
                 //offent,
-                se.data_length, se.first_cluster, file_offset);
+                se.data_length, se.first_cluster, file_offset, path);
 #undef ATTR
 #undef TIME
 #undef TIMEFMT
-            ::wprintf(L"%s", path);
-            ::putchar('\n');
             if ((fe.attributes & 0x10) == 0x10) {
                 exFatFile child(*this);
                 if (child.open(se)) {
                     this->enum_files_worker(child, path, outdir, pattern, level + 1);
                 } else {
-                    fwprintf(stderr, L"Failed to open: %s\n", path);
+                    this->log(L"Failed to open: %s\n", path);
                 }
                 if (outdir != NULL) {
                     set_file_info(path, outdir, fe, true);
@@ -721,9 +759,9 @@ private:
             } else if (outdir != NULL && (pattern == NULL || wildmatch(path, pattern))) {
                 if (extract_file(path, outdir, se)) {
                     set_file_info(path, outdir, fe, false);
-                    _cwprintf(L"Saved: %s\n", path);
+                    this->log(L"Saved: %s\n", path);
                 } else {
-                    _cwprintf(L"FAIL: %s\n", path);
+                    this->log(L"FAIL: %s\n", path);
                 }
             }
         }
@@ -732,7 +770,7 @@ private:
 
 void usage()
 {
-    fprintf(stderr, "excavator [-c cluster_size] [-r reserved_sectors] [-o out_dir] image.dd\n");
+    fprintf_s(stderr, "excavator [-c cluster_size] [-r reserved_sectors] [-o out_dir] [-l out_list] [-i out_info] image.dd [pattern]\n");
 }
 
 int wmain(int argc, wchar_t** argv)
@@ -740,9 +778,11 @@ int wmain(int argc, wchar_t** argv)
     uint32_t cluster_size = 0;
     uint32_t reserved_sectors = 0;
     const wchar_t* out_dir = NULL;
+    const wchar_t* out_list = NULL;
+    const wchar_t* out_info = NULL;
     option opt;
 
-    for (int ch; (ch = opt.getopt(argc, argv, L"c:r:o:")) != -1; ) {
+    for (int ch; (ch = opt.getopt(argc, argv, L"c:r:o:l:i:")) != -1; ) {
         switch (ch) {
         case L'c':
             cluster_size = wcstoul(opt.optarg, NULL, 10);
@@ -753,12 +793,19 @@ int wmain(int argc, wchar_t** argv)
         case L'o':
             out_dir = opt.optarg;
             break;
+        case L'l':
+            out_list = opt.optarg;
+            break;
+        case L'i':
+            out_info = opt.optarg;
+            break;
         case L'?':
         default:
             usage();
             return 1;
         }
     }
+#define ISPOW2(x)   (((x) & (x) - 1) == 0)
     if (opt.optind >= argc || ISPOW2(cluster_size) == false) {
         usage();
         return 1;
@@ -767,9 +814,8 @@ int wmain(int argc, wchar_t** argv)
     const wchar_t* file = argv[opt.optind];
     const wchar_t* pattern = opt.optind + 1 < argc ? argv[opt.optind + 1] : NULL;
 
-    exFat exfat(cluster_size, reserved_sectors);
+    exFat exfat(cluster_size, reserved_sectors, out_list, out_info);
     if (exfat.open(file)) {
-        fwprintf(stderr, L"file: \"%s\"\n", file);
         exfat.enum_files(out_dir, pattern);
         return 1;
     }
