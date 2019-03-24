@@ -2,7 +2,7 @@
 excavator.exe: excavator.obj
  link /nologo /dynamicbase:no /ltcg /machine:x86 /map /merge:.rdata=.text /nxcompat /opt:icf /opt:ref /out:excavator.exe /map:excavator.map /release /debug /pdbaltpath:"%_PDB%" excavator.obj kernel32.lib
 
-excavator.obj: excavator.cpp
+excavator.obj: excavator.cpp option.hpp
  cl /nologo /c /GF /GL /GR- /GS- /Gy /MD /O1ib1 /W4 /WX /Zi /D "NDEBUG" /D "_CONSOLE" /D "_UNICODE" /D "UNICODE" excavator.cpp
 
 !IF 0
@@ -22,86 +22,9 @@ excavator.obj: excavator.cpp
 #include <direct.h>
 #include <io.h>
 #include <share.h>
+#include "option.hpp"
 
 typedef unsigned int uint_t;
-
-class option
-{
-public:
-    const wchar_t* optarg;
-    int optopt;
-    int optind;
-
-private:
-    const wchar_t* i_cur;
-
-public:
-    option()
-        : optarg()
-        , optopt()
-        , optind(1)
-        , i_cur()
-    {
-    }
-    int getopt(int argc, const wchar_t* const* argv, const wchar_t* opts)
-    {
-        wchar_t ch;
-        wchar_t* pch;
-
-#define isoption(c)     (((c) | 2) == '/')
-#define isoptarg(s)     (isoption((s)[0]) && (s)[1] != 0)
-#define isoptstop(s)    (isoption((s)[1]) && (s)[2] == 0)
-#define getcurarg(argv) ((argv)[this->optind])
-
-        if (this->i_cur == NULL) {
-            if (this->optind >= argc) {
-                return -1;
-            } else if (isoptarg(getcurarg(argv)) == 0) {
-                return -1;
-            } else if (isoptstop(getcurarg(argv))) {
-                this->optind++;
-                return -1;
-            }
-            this->i_cur = getcurarg(argv) + 1;
-        }
-
-        ch = *this->i_cur;
-        this->optopt = ch;
-
-        if (ch == L'=' || (pch = ::wcschr(opts, ch)) == NULL) {
-            this->i_cur++;
-            if (*this->i_cur == L'\0') {
-                this->optind++;
-                this->i_cur = NULL;
-            }
-            return L'?';
-        }
-
-        this->i_cur++;
-
-        if (*++pch == L':') {
-            this->optind++;
-            if (*this->i_cur != L'\0') {
-                this->optarg = this->i_cur;
-            } else if (this->optind < argc) {
-                this->optarg = getcurarg(argv);
-                this->optind++;
-            } else {
-                this->i_cur = NULL;
-                return L'?';
-            }
-            this->i_cur = NULL;
-        } else {
-            if (*this->i_cur == 0) {
-                this->optind++;
-                this->i_cur = NULL;
-            }
-            this->optarg = NULL;
-        }
-
-        return ch;
-    }
-};
 
 class File
 {

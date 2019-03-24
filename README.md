@@ -36,6 +36,7 @@ The excavator provides some unique features which ordinary recovery software (ev
 
 ## Acknowledgements
 - [Reverse Engineering the Microsoft exFAT File System](https://www.sans.org/reading-room/whitepapers/forensics/paper/33274) by Robert Shullich
+- [A minimal POSIX getopt()](https://github.com/skeeto/getopt)
 
 ## See also
 - [The Sleuth Kit](https://github.com/sleuthkit/sleuthkit)
