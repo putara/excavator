@@ -6,7 +6,7 @@ Unlike signature-based recovery software, the excavator uses a heuristic approac
 The excavator provides some unique features which ordinary recovery software (even commercial software) cannot offer.
 
 - Way faster to scan files (as fast as `dir /s` or `ls -lR` command)
-- Ability to recover fragmented files if FAT is intact
+- Ability to recover fragmented files provided FAT is still intact
 - Very small program size
 
 **This is not undelete software.** Previously deleted files are excluded and cannot be recovered.
@@ -17,11 +17,11 @@ The excavator provides some unique features which ordinary recovery software (ev
 - A raw disk image of an accidentally formatted exFAT partition
 
 ## Usage
-`excavator [-c cluster_size] [-r reserved_sectors] [-o out_dir] image.dd [pattern]`
+`excavator [-c cluster_size] [-r reserved_sectors] [-o out_dir] [-l out_list] [-i out_info] image.dd [pattern]`
 
 1. Create a disk image using the `dd` command or [this tool](http://hddguru.com/software/HDD-Raw-Copy-Tool/)
 2. Run `excacator` from CLI
-3. If nothing is displayed, try different cluster size
+3. If no files are found, try different cluster size
 4. RTFC for more info
 
 ## Build
@@ -42,4 +42,5 @@ The excavator provides some unique features which ordinary recovery software (ev
 - [The Sleuth Kit](https://github.com/sleuthkit/sleuthkit)
 
 ## License
-Released under the [GPL v3](https://www.gnu.org/licenses/gpl-3.0.en.html).
+The excavator code is released under the [GPL v3](https://www.gnu.org/licenses/gpl-3.0.en.html).
+The option class and its tests are public domain.
