@@ -1,12 +1,18 @@
-#if 0
-excavator.exe: excavator.obj
- link /nologo /dynamicbase:no /ltcg /machine:x86 /map /merge:.rdata=.text /nxcompat /opt:icf /opt:ref /out:excavator.exe /map:excavator.map /release /debug /pdbaltpath:"%_PDB%" excavator.obj kernel32.lib
+/**
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+* See the GNU General Public License for more details.
 
-excavator.obj: excavator.cpp option.hpp
- cl /nologo /c /GF /GL /GR- /GS- /Gy /MD /O1ib1 /W4 /WX /Zi /D "NDEBUG" /D "_CONSOLE" /D "_UNICODE" /D "UNICODE" excavator.cpp
-
-!IF 0
-#else
+* You should have received a copy of the GNU General Public License
+* along with this program.
+* If not, see <https://www.gnu.org/licenses/>.
+*/
 
 #include <stdio.h>
 #include <stdint.h>
@@ -769,7 +775,3 @@ int wmain(int argc, wchar_t** argv)
     }
     return 2;
 }
-
-#endif /*
-!ENDIF
-#*/

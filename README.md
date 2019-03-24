@@ -1,12 +1,12 @@
 # Introduction
 Recover files from an accidentally formatted exFAT drive such as SDXC/microSDXC card.  
-Unlike signature-based recovery software, the excavator uses a heuristic approach to locate mandatory system files to infer the missing master boot record.
+Unlike signature-based recovery software, the excavator uses a heuristic approach to infer the missing master boot record.
 
 ## Features
 The excavator provides some unique features which ordinary recovery software (even commercial software) cannot offer.
 
 - Way faster to scan files (as fast as `dir /s` or `ls -lR` command)
-- Ability to recover fragmented files
+- Ability to recover fragmented files if FAT is intact
 - Very small program size
 
 **This is not undelete software.** Previously deleted files are excluded and cannot be recovered.
@@ -26,7 +26,7 @@ The excavator provides some unique features which ordinary recovery software (ev
 
 ## Build
 1. Open Developer console
-1. Run `nmake /f excavator.cpp`
+1. Run `nmake`
 
 ## Todos
 - [X] Support fragmented directory entries
@@ -42,4 +42,4 @@ The excavator provides some unique features which ordinary recovery software (ev
 - [The Sleuth Kit](https://github.com/sleuthkit/sleuthkit)
 
 ## License
-TBA
+Released under the [GPL v3](https://www.gnu.org/licenses/gpl-3.0.en.html).
