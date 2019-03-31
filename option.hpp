@@ -51,25 +51,32 @@ public:
         } else if (arg == NULL || isoptarg(arg) == false) {
             return -1;
         }
-        ch = arg[this->optpos];
+        this->optopt = ch = arg[this->optpos];
         if ((opt = ::wcschr(optstring, ch)) == NULL) {
             return L'?';
         }
         if (opt[1] == L':') {
             opt = arg + this->optpos + 1;
             if (*opt != L'\0') {
+                this->optarg = opt;
                 this->optind++;
+                this->optpos = 1;
+                return ch;
             } else if ((opt = this->getcurarg(argc, argv, this->optind + 1)) != NULL) {
+                this->optarg = opt;
                 this->optind += 2;
+                this->optpos = 1;
+                return ch;
             } else {
-                return L'?';
+                return *optstring == L':' ? L':' : L'?';
             }
-            this->optarg = opt;
-        } else if (arg[++this->optpos] == L'\0') {
-            this->optind++;
+        } else {
+            if (arg[++this->optpos] == L'\0') {
+                this->optind++;
+                this->optpos = 1;
+            }
+            return ch;
         }
-        this->optpos = 1;
-        return ch;
     }
 };
 
@@ -91,21 +98,21 @@ public:
     }
     void assert_equals(const wchar_t* s, int x, int y)
     {
-        if (x) {
+        if (x == y) {
             wprintf(L"\033[32;1mPASS\033[0m %s %s\n", this->name, s);
             count_pass++;
         } else {
             if (x < L' ') {
                 wprintf(L"\033[31;1mFAIL\033[0m %s %s ; %d != %d\n", this->name, s, x, y);
             } else {
-                wprintf(L"\033[31;1mFAIL\033[0m %s %s ; '%c' != %c\n", this->name, s, x, y);
+                wprintf(L"\033[31;1mFAIL\033[0m %s %s ; '%c' != '%c'\n", this->name, s, x, y);
             }
             count_fail++;
         }
     }
     void assert_equals(const wchar_t* s, const wchar_t* x, const wchar_t* y)
     {
-        if (x) {
+        if ((x != NULL) == (y != NULL) && ::wcscmp(x, y) == 0) {
             wprintf(L"\033[32;1mPASS\033[0m %s %s\n", this->name, s);
             count_pass++;
         } else {
